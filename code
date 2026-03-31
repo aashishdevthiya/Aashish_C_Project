@@ -1,0 +1,176 @@
+import sys
+
+def evaluate(expression):
+    # ----- balance check -----------------------------------------------------
+    bracket_stack = []
+    for char in expression:
+        if char not in '()':
+            continue
+        if char == '(':
+            bracket_stack.append(char)
+        elif len(bracket_stack) and bracket_stack[-1] == '(':
+            bracket_stack.pop()
+        else:
+            return "Error: Unbalanced parentheses"
+    if len(bracket_stack) > 0:
+        return "Error: Unbalanced parentheses"
+
+    # ----- whitespace validation --------------------------------------------
+    sanitized_expr = ""
+    numeric_chars = "0123654789."
+    prev_char = ''
+    space_detected = False
+    for char in expression:
+        if char == ' ':
+            if prev_char in numeric_chars:
+                space_detected = True
+        else:
+            if char in numeric_chars and space_detected:
+                return "Error: Invalid expression"
+            sanitized_expr += char
+            prev_char = char
+            if char not in numeric_chars:
+                space_detected = False
+    expression = sanitized_expr
+
+    # ----- token generation -------------------------------------------------
+    tokens = []
+    digits = "0123456789"
+    operators = "+-*^%/"
+    precedence = {'^': 0, '*': 1, '/': 1, '%': 1, '+': 2, '-': 2}
+    buffer = ""
+    
+    for char in expression:
+        # Unary minus logic
+        if char == '-' and len(buffer) == 0 and (len(tokens) == 0 or tokens[-1] == '(' or tokens[-1] in operators):
+            buffer += char
+            continue
+            
+        if char in digits or char == '.':
+            buffer += char
+        else:
+            if len(buffer) > 0:
+                if buffer == "-":
+                    tokens.extend(["0", "-"])
+                else:
+                    if len(tokens) > 0 and tokens[-1] == ')':
+                        tokens.append('*')
+                    tokens.append(buffer)
+            buffer = ""
+            # Implicit multiplication check
+            if char == '(' and len(tokens) > 0 and not (tokens[-1] in operators or tokens[-1] == '('):
+                tokens.append('*')
+            tokens.append(char)
+            
+    if len(buffer) > 0:
+        if len(tokens) > 0 and tokens[-1] == ')':
+            tokens.append('*')
+        tokens.append(buffer)
+
+    # ----- shunting-yard processing -----------------------------------------
+    values = []
+    ops_stack = []
+    
+    for token in tokens:
+        if token not in '()' and token not in operators:
+            values.append(float(token))
+            continue
+        if token == '(':
+            ops_stack.append(token)
+            continue
+        if token == ')':
+            while len(ops_stack) and ops_stack[-1] != '(':
+                if len(values) < 2 or len(ops_stack) < 1:
+                    ops_stack.append(token)
+                    continue
+                
+                val_b = values.pop()
+                val_a = values.pop()
+                op = ops_stack.pop()
+                
+                if (op == '/' or op == '%') and val_b == 0:
+                    return "Error: Division by zero"
+                
+                if op == '+': res = val_a + val_b
+                elif op == '-': res = val_a - val_b
+                elif op == '*': res = val_a * val_b
+                elif op == '^': res = val_a ** val_b
+                elif op == '/': res = int((val_a / val_b) * 10000) / 10000.0
+                elif op == '%': 
+                    quotient = int(val_a / val_b)
+                    res = val_a - (val_b * quotient)
+                else: res = 0
+                values.append(res)
+            ops_stack.pop() # Remove '('
+            continue
+
+        # Standard operator handling
+        while len(ops_stack) > 0 and ops_stack[-1] in operators and precedence[ops_stack[-1]] <= precedence[token]:
+            if token == '^' and ops_stack[-1] == '^':
+                break
+            if len(values) < 2 or len(ops_stack) < 1:
+                return "Error: Invalid expression"
+                
+            val_b = values.pop()
+            val_a = values.pop()
+            op = ops_stack.pop()
+            
+            if (op == '/' or op == '%') and val_b == 0:
+                return "Error: Division by zero"
+                
+            if op == '+': res = val_a + val_b
+            elif op == '-': res = val_a - val_b
+            elif op == '*': res = val_a * val_b
+            elif op == '^': res = val_a ** val_b
+            elif op == '/': res = int((val_a / val_b) * 10000) / 10000.0
+            elif op == '%': 
+                quotient = int(val_a / val_b)
+                res = val_a - (val_b * quotient)
+            else: res = 0
+            values.append(res)
+        ops_stack.append(token)
+
+    # Final reduction
+    while True:
+        if len(values) < 2 or len(ops_stack) < 1:
+            break
+        val_b = values.pop()
+        val_a = values.pop()
+        op = ops_stack.pop()
+        
+        if (op == '/' or op == '%') and val_b == 0:
+            return "Error: Division by zero"
+            
+        if op == '+': res = val_a + val_b
+        elif op == '-': res = val_a - val_b
+        elif op == '*': res = val_a * val_b
+        elif op == '^': res = val_a ** val_b
+        elif op == '/': res = int((val_a / val_b) * 10000) / 10000.0
+        elif op == '%': 
+            quotient = int(val_a / val_b)
+            res = val_a - (val_b * quotient)
+        else: res = 0
+        values.append(res)
+
+    # Result extraction
+    if len(ops_stack) == 1 and ops_stack[-1] == '-' and len(values) == 1:
+        final_output = (-1) * int(values[-1])
+    elif len(values) != 1 or len(ops_stack) != 0:
+        return "Error: Invalid expression"
+    else:
+        final_output = int(values[-1])
+
+    return str(final_output)
+
+
+def main():
+    input_data = sys.stdin.readline()
+    if not input_data:
+        return
+    raw_expr = input_data.rstrip('\n')
+    output = evaluate(raw_expr)
+    print(output)
+
+
+if __name__ == "__main__":
+    main()
